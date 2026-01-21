@@ -1,0 +1,7 @@
+python-jobspy
+pandas
+openpyxl
+google-generativeai
+googlesearch-python
+python-dotenv
+requests

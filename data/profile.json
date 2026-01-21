@@ -1,0 +1,78 @@
+{
+  "name": "Jeevananthan S",
+  "contact": {
+    "email": "jeevananthan9806@gmail.com",
+    "phone": "+91-90428-15755",
+    "location": "Kochi, India"
+  },
+  "links": {
+    "linkedin": "https://www.linkedin.com/in/jeevananthan-senthilkumar-48b814325/",
+    "github": "https://github.com/Zenthoriax",
+    "portfolio": "https://zenthoriax.github.io/Portfolio-Zenthoriax/"
+  },
+  "education": {
+    "university": "Jain University, Kochi",
+    "degree": "B.Tech in Computer Science & Engineering (AI & ML)",
+    "duration": "Aug 2024 - June 2028",
+    "year": "2nd Year (4th Semester)",
+    "cgpa": "8.7/10"
+  },
+  "target_role": "AI/ML Intern",
+  "skills": [
+    "Java",
+    "SQL",
+    "PyTorch",
+    "TensorFlow",
+    "Scikit-learn",
+    "Pandas",
+    "NumPy",
+    "Docker",
+    "Git",
+    "Streamlit",
+    "XGBoost",
+    "CNN",
+    "Time-Series Forecasting",
+    "Generative AI",
+    "Computer Vision",
+    "Python"
+  ],
+  "projects": [
+    {
+      "name": "Hyper-Local Vector Control Architecture",
+      "tech": "Edge AI, TensorRT, NVIDIA Jetson, SegFormer-B0, Unreal Engine 5",
+      "description": "Designed privacy-preserving edge vision architecture to detect stagnant water. Proposed pipeline using SegFormer-B0 optimized with TensorRT for real-time inference on Jetson Orin Nano."
+    },
+    {
+      "name": "Real-Time Groundwater Predictor",
+      "tech": "XGBoost, Machine Learning, Time-Series",
+      "description": "Built a model to predict groundwater levels using DWLR sensor data. Achieved lower error rates than baseline linear models using XGBoost regression."
+    },
+    {
+      "name": "Fashion-MNIST Image Classifier",
+      "tech": "TensorFlow, Keras, CNN, Streamlit",
+      "description": "Built a CNN to classify clothing images and deployed it via a Streamlit web interface."
+    },
+    {
+      "name": "Personal Finance Tracker",
+      "tech": "PostgreSQL, Docker, Full Stack",
+      "description": "Developed a containerized application for expense tracking with normalized database schemas."
+    }
+  ],
+  "certifications": [
+    "Machine Learning with Python - IBM",
+    "Developing AI Applications with Python and Flask - IBM",
+    "Python Data Structures - University of Michigan",
+    "Fundamentals of Java Programming - Board Infinity"
+  ],
+  "preferences": {
+    "locations": [
+      "Remote",
+      "Bangalore",
+      "Kochi",
+      "Hyderabad",
+      "Chennai"
+    ],
+    "work_type": "Internship",
+    "min_duration": "2 months"
+  }
+}

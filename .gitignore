@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment Variables (NEVER commit credentials!)
+.env
+
+# Data Files (Exclude scraped/processed data but keep profile)
+data/raw/
+data/verified/
+data/history.json
+data/processed.json
+data/processed_metadata.json
+data/*.csv
+data/*.xlsx
+data/Job_Application_Tracker.xlsx
+
+# Keep these in Git
+!data/profile.json
+!data/.gitkeep
+
+# Preview/temp files
+data/profile_enhanced_PREVIEW.json
