@@ -10,11 +10,20 @@ TRACKER_FILE = os.path.join("data", "Job_Application_Tracker.xlsx")
 def update_excel_tracker(new_jobs_df):
     """
     Appends ONLY emailed jobs to the Master Excel Tracker with Dropdown Status.
+    Also syncs to SQLite database for enhanced tracking.
     """
     if new_jobs_df.empty:
         return
 
     print("📊 Updating Master Excel Tracker with emailed jobs...")
+    
+    # Import database manager
+    try:
+        from db_manager import add_job, sync_to_excel
+        use_db = True
+    except ImportError:
+        print("⚠️ Database manager not available, using Excel only")
+        use_db = False
 
     # 1. Prepare the Data Structure
     export_df = pd.DataFrame()
@@ -29,27 +38,43 @@ def update_excel_tracker(new_jobs_df):
     export_df['Link'] = new_jobs_df['job_url']
     export_df['Match Score'] = new_jobs_df['relevance_score']
     export_df['Status'] = "Not Applied" # Default Status
-
-    # 2. Check if Tracker exists
-    if os.path.exists(TRACKER_FILE):
-        existing_df = pd.read_excel(TRACKER_FILE)
-        
-        # Double-check: Don't add if Link is already in Excel
-        export_df = export_df[~export_df['Link'].isin(existing_df['Link'])]
-        
-        if export_df.empty:
-            return
-
-        final_df = pd.concat([existing_df, export_df], ignore_index=True)
+    
+    # 2. Add to database if available
+    if use_db:
+        for _, row in new_jobs_df.iterrows():
+            add_job(
+                company=row['company'],
+                role=row['title'],
+                link=row['job_url'],
+                match_score=row['relevance_score'],
+                location=row.get('work_mode', 'Unknown'),
+                duration=row.get('duration', 'Not Specified')
+            )
+        # Sync database to Excel
+        sync_to_excel()
+        print(f"   📝 Added {len(new_jobs_df)} jobs to database and Excel")
     else:
-        final_df = export_df
+        # Fallback to Excel only
+        # 3. Check if Tracker exists
+        if os.path.exists(TRACKER_FILE):
+            existing_df = pd.read_excel(TRACKER_FILE)
+            
+            # Double-check: Don't add if Link is already in Excel
+            export_df = export_df[~export_df['Link'].isin(existing_df['Link'])]
+            
+            if export_df.empty:
+                return
 
-    # 3. Save to Excel
-    final_df.to_excel(TRACKER_FILE, index=False)
+            final_df = pd.concat([existing_df, export_df], ignore_index=True)
+        else:
+            final_df = export_df
 
-    # 4. Add Dropdown Menus
-    add_dropdowns(TRACKER_FILE, len(final_df))
-    print(f"   📝 Added {len(export_df)} jobs to {TRACKER_FILE}")
+        # 4. Save to Excel
+        final_df.to_excel(TRACKER_FILE, index=False)
+
+        # 5. Add Dropdown Menus
+        add_dropdowns(TRACKER_FILE, len(final_df))
+        print(f"   📝 Added {len(export_df)} jobs to {TRACKER_FILE}")
 
 def add_dropdowns(filename, total_rows):
     """Adds the 'Status' dropdown to the Excel file."""

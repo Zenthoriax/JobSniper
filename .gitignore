@@ -32,6 +32,7 @@ data/processed.json
 data/processed_metadata.json
 data/*.csv
 data/*.xlsx
+data/*.db
 data/Job_Application_Tracker.xlsx
 
 # Keep these in Git

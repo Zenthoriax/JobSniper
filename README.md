@@ -7,6 +7,7 @@ An intelligent job scraping and matching system that automatically finds relevan
 - **Multi-Platform Scraping**: Searches LinkedIn, Indeed, and Glassdoor
 - **Smart Filtering**: AI-powered job matching with relevance scoring
 - **Automated Notifications**: Email alerts for high-quality matches
+- **Interactive Dashboard**: Streamlit web interface to visualize jobs and analytics
 - **GitHub Actions Integration**: Runs automatically every morning at 8 AM IST
 - **Duplicate Prevention**: Tracks processed jobs and auto-cleans old entries
 - **Excel Tracker**: Maintains application status in organized spreadsheet
@@ -101,6 +102,57 @@ cd src
 python main.py
 ```
 
+## 📊 Dashboard
+
+JobSniper now includes an interactive web dashboard built with Streamlit!
+
+### Launch Dashboard
+```bash
+# From project root
+streamlit run dashboard.py
+```
+
+The dashboard will open in your browser at `http://localhost:8501`
+
+### Dashboard Features
+
+**📊 Overview Page**
+- Quick stats and metrics
+- Recent high-scoring jobs
+- Activity summary
+
+**💼 Job Listings Page**
+- Searchable and filterable job table
+- Sort by score, company, or date
+- Filter by score range, company, work mode
+- Direct apply links
+
+**📋 Application Tracker Page**
+- View and manage your applications
+- Filter by status (Applied, Interview, Rejected, etc.)
+- Track application progress
+- Integrated with Excel tracker
+
+**📈 Analytics Page**
+- Score distribution histogram
+- Top companies hiring (bar chart)
+- Work mode breakdown (pie chart)
+- Key insights and metrics
+
+**👤 Profile Management Page**
+- View and edit your profile
+- Update skills, preferences, locations
+- Save changes directly to `profile.json`
+
+### Dashboard Screenshots
+The dashboard provides a clean, modern interface to:
+- Visualize your job search pipeline
+- Track application status
+- Analyze job market trends
+- Manage your profile settings
+
+All data syncs automatically with the main JobSniper system!
+
 ## 📊 How It Works
 
 ```
@@ -122,6 +174,10 @@ python main.py
        ↓
 ┌─────────────┐
 │  5. TRACK   │ → Updates Excel tracker
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│ 6. DASHBOARD│ → Visualize and manage via web UI
 └─────────────┘
 ```
 

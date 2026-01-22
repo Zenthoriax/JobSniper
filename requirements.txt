@@ -5,3 +5,6 @@ google-generativeai
 googlesearch-python
 python-dotenv
 requests
+streamlit
+plotly
+altair
