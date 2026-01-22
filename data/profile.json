@@ -66,13 +66,18 @@
   ],
   "preferences": {
     "locations": [
+      "Remote USA",
+      "United States Remote",
       "Remote",
       "Bangalore",
       "Kochi",
       "Hyderabad",
-      "Chennai"
+      "Chennai",
+      "Pune",
+      "Mumbai"
     ],
-    "work_type": "Internship",
-    "min_duration": "1 months"
+    "work_type": "Remote Internship",
+    "min_duration": "2 months",
+    "country": "USA"
   }
 }

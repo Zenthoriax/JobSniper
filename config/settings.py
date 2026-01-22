@@ -1,32 +1,45 @@
 import os
 
 # --- Search Configuration ---
+# Focus on remote opportunities and India tech hubs
 SEARCH_QUERIES = [
-    "AI Intern", 
-    "Machine Learning Intern", 
-    "Data Science Intern",
-    "Deep Learning Intern",
-    "ML Research Intern",
-    "AI Research Intern"
+    "AI Intern Remote",
+    "Machine Learning Intern Remote",
+    "Data Science Intern Remote",
+    "AI Intern",
+    "ML Intern",
+    "Data Science Intern"
 ]
-# Removed "Deep Learning" etc for now to speed up the test. 
-# Once this works, you can add them back.
 
+# India for local opportunities
 COUNTRY = 'India' 
 
-# NOW WE USE ALL OF THESE:
-LOCATIONS = ["Remote", "Bangalore", "Kochi", "Hyderabad", "Chennai"]
+# Priority: Remote first, then India tech hubs
+LOCATIONS = [
+    "Remote",              # Priority 1: Remote (global, includes US)
+    "Bangalore",           # Priority 2: India tech hubs
+    "Kochi",
+    "Chennai",
+    "Hyderabad", 
+    "Pune"
+]
 
 # --- Scraper Settings ---
-# Reduced to 24 hours to get fresher jobs and avoid duplicates
 HOURS_OLD = 24 
 
-# Lower this to 10.
-# Why? 3 Queries * 5 Locations * 3 Sites * 10 Jobs = 450 potential requests.
-# 10 is plenty per slot.
+# Results per query/location/site
 RESULTS_WANTED = 10
 
-TARGET_SITES = ["linkedin", "indeed", "glassdoor"]
+# JobSpy supported sites (5 total for maximum coverage!)
+# Note: Google/Microsoft company career pages need custom scrapers
+# But these sites already show Google/Microsoft job postings
+TARGET_SITES = [
+    "linkedin",        # Professional network, has Google/MS jobs
+    "indeed",          # Largest job board, has Google/MS jobs
+    "glassdoor",       # Company reviews + salaries + jobs
+    "zip_recruiter",   # Good for remote jobs
+    "google"           # Google Jobs (aggregates from multiple sources including Google Careers!)
+]
 
 # --- Runtime flags ---
 # When False, the auditor will use an enhanced local rule-based scorer (no API calls).

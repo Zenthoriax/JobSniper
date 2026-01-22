@@ -1,13 +1,18 @@
 """
 JobSniper Dashboard - Interactive Web Interface
 Visualize job search data, track applications, and manage your profile
+Manual scraping control only - no automation
 """
 
 import streamlit as st
 import pandas as pd
 import json
 import os
+import subprocess
+import threading
+import time
 from datetime import datetime, timedelta
+from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
 import hashlib
@@ -70,6 +75,7 @@ TRACKER_FILE = "data/Job_Application_Tracker.xlsx"
 PROFILE_FILE = "data/profile.json"
 HISTORY_FILE = "data/history.json"
 PROCESSED_FILE = "data/processed.json"
+SCRAPER_LOG_FILE = "data/scraper_log.txt"
 
 # --- Helper Functions ---
 @st.cache_data(ttl=60)
@@ -114,14 +120,31 @@ def load_processed():
             return json.load(f)
     return []
 
+def load_config():
+    """Load scraper configuration"""
+    import sys
+    sys.path.insert(0, 'config')
+    try:
+        import settings
+        return {
+            'queries': settings.SEARCH_QUERIES,
+            'locations': settings.LOCATIONS,
+            'sites': settings.TARGET_SITES,
+            'hours_old': settings.HOURS_OLD,
+            'use_gemini': settings.USE_GEMINI,
+            'country': settings.COUNTRY
+        }
+    except:
+        return {}
+
 # --- Sidebar ---
 st.sidebar.title("🦅 JobSniper")
-st.sidebar.markdown("**Autonomous Job Hunter**")
+st.sidebar.markdown("**Manual Job Hunter**")
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["📊 Overview", "💼 Job Listings", "📋 Application Tracker", "📈 Analytics", "👤 Profile"]
+    ["🎯 Scraper Control", "📊 Overview", "💼 Job Listings", "📋 Application Tracker", "📈 Analytics", "👤 Profile"]
 )
 
 st.sidebar.markdown("---")
@@ -139,10 +162,151 @@ if st.sidebar.button("🚪 Logout"):
     st.session_state["password_correct"] = False
     st.rerun()
 
+# --- PAGE 0: Scraper Control ---
+if page == "🎯 Scraper Control":
+    st.title("🎯 Manual Scraper Control")
+    st.markdown("### Run job scraping manually from this dashboard")
+    
+    # Configuration Display
+    st.subheader("⚙️ Current Configuration")
+    config = load_config()
+    
+    if config:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**🔍 Search Queries:**")
+            for query in config.get('queries', []):
+                st.markdown(f"- {query}")
+            
+            st.markdown("**📍 Locations:**")
+            for loc in config.get('locations', []):
+                st.markdown(f"- {loc}")
+        
+        with col2:
+            st.markdown("**🌐 Job Sites:**")
+            for site in config.get('sites', []):
+                st.markdown(f"- {site.title()}")
+            
+            st.markdown(f"**⏰ Freshness:** Last {config.get('hours_old', 24)} hours")
+            st.markdown(f"**🤖 AI Scoring:** {'Enabled (Gemini)' if config.get('use_gemini', False) else 'Disabled (Local)'}")
+            st.markdown(f"**🌍 Country:** {config.get('country', 'India')}")
+    
+    st.markdown("---")
+    
+    # Scraper Control
+    st.subheader("🚀 Run Scraper")
+    
+    # Initialize session state for scraper status
+    if 'scraper_running' not in st.session_state:
+        st.session_state.scraper_running = False
+    if 'scraper_logs' not in st.session_state:
+        st.session_state.scraper_logs = []
+    if 'last_run' not in st.session_state:
+        st.session_state.last_run = "Never"
+    
+    # Status indicator
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col1:
+        if st.session_state.scraper_running:
+            st.markdown("### 🟡 Status: RUNNING")
+        else:
+            st.markdown("### 🟢 Status: IDLE")
+    
+    with col2:
+        st.markdown(f"**Last Run:** {st.session_state.last_run}")
+    
+    with col3:
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Run button
+    col_a, col_b = st.columns([1, 3])
+    
+    with col_a:
+        if st.button("🚀 Run Scraper Now", type="primary", use_container_width=True, disabled=st.session_state.scraper_running):
+            st.session_state.scraper_running = True
+            st.session_state.scraper_logs = []
+            
+            with st.spinner("🔄 Running job scraper..."):
+                try:
+                    # Run main.py
+                    import sys
+                    sys.path.insert(0, 'src')
+                    
+                    # Capture output
+                    log_container = st.empty()
+                    
+                    # Import and run
+                    from main import main as run_scraper
+                    
+                    # Create a custom stdout to capture prints
+                    import io
+                    from contextlib import redirect_stdout
+                    
+                    f = io.StringIO()
+                    with redirect_stdout(f):
+                        run_scraper()
+                    
+                    output = f.getvalue()
+                    st.session_state.scraper_logs = output.split('\n')
+                    st.session_state.last_run = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    st.session_state.scraper_running = False
+                    
+                    st.balloons()
+                    st.success("✅ Scraper completed successfully!")
+                    st.cache_data.clear()
+                    time.sleep(1)
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.session_state.scraper_logs.append(f"❌ Error: {str(e)}")
+                    st.session_state.scraper_running = False
+                    st.error(f"❌ Scraper failed: {str(e)}")
+    
+    with col_b:
+        if st.button("🗑️ Clear Logs", use_container_width=True):
+            st.session_state.scraper_logs = []
+            st.rerun()
+    
+    # Logs display
+    st.subheader("📋 Scraper Logs")
+    
+    if st.session_state.scraper_logs:
+        log_text = "\n".join(st.session_state.scraper_logs)
+        st.code(log_text, language="text")
+    else:
+        st.info("No logs yet. Run the scraper to see output here.")
+    
+    # Quick stats after run
+    if st.session_state.last_run != "Never":
+        st.markdown("---")
+        st.subheader("📊 Latest Run Summary")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Jobs", len(verified_df))
+        with col2:
+            if len(verified_df) > 0:
+                high_score = len(verified_df[verified_df['relevance_score'] >= 75])
+                st.metric("High Score (75+)", high_score)
+            else:
+                st.metric("High Score (75+)", 0)
+        with col3:
+            st.metric("Emailed", len(history))
+        with col4:
+            processed = load_processed()
+            st.metric("Total Scanned", len(processed))
+
 # --- PAGE 1: Overview ---
-if page == "📊 Overview":
+elif page == "📊 Overview":
     st.title("🦅 JobSniper Dashboard")
-    st.markdown("### Welcome to your autonomous job hunting command center!")
+    st.markdown("### Welcome to your manual job hunting command center!")
     
     # Key Metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -179,8 +343,28 @@ if page == "📊 Overview":
     
     st.markdown("---")
     
+    # Quick Actions
+    st.subheader("⚡ Quick Actions")
+    col_a, col_b, col_c = st.columns([1, 1, 1])
+    
+    with col_a:
+        if st.button("🚀 Go to Scraper Control", type="primary", use_container_width=True):
+            st.session_state.page = "🎯 Scraper Control"
+            st.rerun()
+    
+    with col_b:
+        if st.button("🔄 Refresh Dashboard", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    
+    with col_c:
+        if st.button("📧 Email History", use_container_width=True):
+            st.info(f"Total emails sent: {len(history)}")
+    
+    st.markdown("---")
+    
     # Recent Activity
-    st.subheader("📅 Recent Activity")
+    st.subheader("📅 Recent High-Score Jobs")
     
     if len(verified_df) > 0:
         recent_jobs = verified_df.sort_values('relevance_score', ascending=False).head(5)
@@ -202,24 +386,7 @@ if page == "📊 Overview":
                 
                 st.markdown("---")
     else:
-        st.info("No jobs found yet. Run the scraper to get started!")
-    
-    # Quick Actions
-    st.subheader("⚡ Quick Actions")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🔄 Refresh Data", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-    
-    with col2:
-        if st.button("📧 View Email History", use_container_width=True):
-            st.info(f"Total emails sent: {len(history)}")
-    
-    with col3:
-        if st.button("📊 View Full Analytics", use_container_width=True):
-            st.switch_page
+        st.info("No jobs found yet. Go to Scraper Control to run a manual search!")
 
 # --- PAGE 2: Job Listings ---
 elif page == "💼 Job Listings":
@@ -596,4 +763,4 @@ elif page == "👤 Profile":
 # --- Footer ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("Made with ❤️ by JobSniper")
-st.sidebar.markdown("v2.1 - Dashboard Edition")
+st.sidebar.markdown("v3.0 - Manual Control Edition")
