@@ -24,6 +24,10 @@ load_dotenv()
 # Import background scraper
 sys.path.insert(0, 'src/modules')
 from background_scraper import get_scraper
+from db_connector import get_db
+
+# Initialize database (auto-creates tables if needed)
+db = get_db()
 
 # --- Security Configuration ---
 AUDIT_LOG_FILE = "data/auth_audit.log"
@@ -280,12 +284,16 @@ SCRAPER_LOG_FILE = "data/scraper_log.txt"
 # --- Helper Functions ---
 @st.cache_data(ttl=60)
 def load_verified_jobs():
-    """Load verified jobs from CSV"""
-    if os.path.exists(VERIFIED_JOBS_FILE):
+    """Load verified jobs from database or CSV fallback"""
+    # Try database first
+    df = db.get_verified_jobs()
+    
+    # If database returns empty and CSV exists, use CSV as fallback
+    if df.empty and os.path.exists(VERIFIED_JOBS_FILE):
         df = pd.read_csv(VERIFIED_JOBS_FILE)
         df['relevance_score'] = pd.to_numeric(df['relevance_score'], errors='coerce').fillna(0)
-        return df
-    return pd.DataFrame()
+    
+    return df
 
 @st.cache_data(ttl=60)
 def load_tracker():
@@ -444,7 +452,7 @@ if page == "🎯 Scraper Control":
     
     with col_b:
         # Stop button with rollback option
-        if st.button("🛑 Stop Scraper", use_container_width=True, disabled=not st.session_state.scraper_running):
+        if st.button("🛑 Stop Scraper", use_container_width=True, disabled=not is_scraper_running):
             # Show confirmation dialog
             st.session_state.show_stop_confirm = True
     
@@ -471,7 +479,6 @@ if page == "🎯 Scraper Control":
                 else:
                     st.error(f"❌ {result['error']}")
                 
-                st.session_state.scraper_running = False
                 st.session_state.show_stop_confirm = False
                 time.sleep(2)
                 st.rerun()
@@ -487,7 +494,6 @@ if page == "🎯 Scraper Control":
                 else:
                     st.error(f"❌ {result['error']}")
                 
-                st.session_state.scraper_running = False
                 st.session_state.show_stop_confirm = False
                 time.sleep(2)
                 st.rerun()

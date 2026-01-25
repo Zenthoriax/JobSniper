@@ -8,6 +8,16 @@ from config import settings
 import re
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+import sys
+
+# Add database connector
+sys.path.insert(0, 'src/modules')
+try:
+    from db_connector import get_db
+    db = get_db()
+except:
+    db = None
+    print("⚠️ Database connector not available, using CSV only")
 
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
@@ -400,8 +410,31 @@ def run_auditor():
 
     if verified_jobs:
         out_df = pd.DataFrame(verified_jobs).sort_values(by='relevance_score', ascending=False)
+        
+        # Save to CSV (for backward compatibility)
         out_df.to_csv(OUTPUT_FILE, index=False)
         print(f"\n🎉 Success! Saved {len(out_df)} new jobs to {OUTPUT_FILE}")
+        
+        # Save to PostgreSQL database
+        if db and db.use_database:
+            saved_count = 0
+            for _, job in out_df.iterrows():
+                job_data = {
+                    'job_url': job.get('job_url'),
+                    'title': job.get('title'),
+                    'company': job.get('company'),
+                    'location': job.get('location'),
+                    'description': job.get('description'),
+                    'date_posted': job.get('date_posted'),
+                    'relevance_score': job.get('relevance_score'),
+                    'match_reason': job.get('match_reason'),
+                    'duration': job.get('duration'),
+                    'work_mode': job.get('work_mode'),
+                    'site': job.get('site')
+                }
+                if db.insert_verified_job(job_data):
+                    saved_count += 1
+            print(f"✅ Also saved {saved_count} jobs to PostgreSQL database")
     else:
         print("\n😔 No high-quality jobs found in this batch.")
 
