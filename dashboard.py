@@ -397,25 +397,29 @@ if page == "🎯 Scraper Control":
     # Scraper Control
     st.subheader("🚀 Run Scraper")
     
-    # Initialize session state for scraper status
-    if 'scraper_running' not in st.session_state:
-        st.session_state.scraper_running = False
-    if 'scraper_logs' not in st.session_state:
-        st.session_state.scraper_logs = []
-    if 'last_run' not in st.session_state:
-        st.session_state.last_run = "Never"
+    # Get background scraper instance and check status
+    scraper = get_scraper()
+    is_scraper_running = scraper.is_running()
+    progress = scraper.get_progress()
     
     # Status indicator
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col1:
-        if st.session_state.scraper_running:
+        if is_scraper_running:
             st.markdown("### 🟡 Status: RUNNING")
         else:
             st.markdown("### 🟢 Status: IDLE")
     
     with col2:
-        st.markdown(f"**Last Run:** {st.session_state.last_run}")
+        if progress.get("start_time"):
+            try:
+                start_time = datetime.fromisoformat(progress["start_time"])
+                st.markdown(f"**Started:** {start_time.strftime('%H:%M:%S')}")
+            except:
+                st.markdown("**Last Run:** Never")
+        else:
+            st.markdown("**Last Run:** Never")
     
     with col3:
         if st.button("🔄 Refresh", use_container_width=True):
@@ -428,58 +432,15 @@ if page == "🎯 Scraper Control":
     col_a, col_b, col_c = st.columns([1, 1, 2])
     
     with col_a:
-        if st.button("🚀 Run Scraper Now", type="primary", use_container_width=True, disabled=st.session_state.scraper_running):
-            st.session_state.scraper_running = True
-            st.session_state.scraper_logs = []
-            st.session_state.scraper_process = None
-            
-            # Create log file path
-            log_file = "data/scraper_live.log"
-            os.makedirs("data", exist_ok=True)
-            
-            # Clear previous log file
-            if os.path.exists(log_file):
-                os.remove(log_file)
-            
-            try:
-                # Start scraper as subprocess
-                import sys
-                python_exe = sys.executable
-                
-                # Create a log file to capture output
-                log_file = "data/scraper_live.log"
-                
-                # Run main.py with output redirected to log file
-                with open(log_file, 'w') as log_f:
-                    process = subprocess.Popen(
-                        [python_exe, "-u", "src/main.py"],
-                        stdout=log_f,
-                        stderr=subprocess.STDOUT,
-                        text=True
-                    )
-                
-                st.session_state.scraper_process = process.pid
-                st.session_state.scraper_start_time = datetime.now()
-                
-                # Show initial status
-                st.info("🔄 Scraper started! The page will auto-refresh to show live logs.")
-                st.info("⏱️ Refresh this page to see the latest logs.")
-                
-                # Save initial state
-                st.session_state.scraper_running = True
+        if st.button("🚀 Run Scraper Now", type="primary", use_container_width=True, disabled=is_scraper_running):
+            result = scraper.start()
+            if result["success"]:
+                st.success("✅ Scraper started in background!")
+                st.info("💡 Dashboard will remain responsive. Refresh to see progress.")
+                time.sleep(2)
                 st.rerun()
-                
-            except Exception as e:
-                import traceback
-                error_details = traceback.format_exc()
-                error_msg = f"❌ Error starting scraper: {str(e)}"
-                st.session_state.scraper_logs.append(error_msg)
-                st.session_state.scraper_logs.append("\n--- Full Error Details ---")
-                st.session_state.scraper_logs.append(error_details)
-                st.session_state.scraper_running = False
-                st.error(error_msg)
-                with st.expander("🔍 View Full Error Details"):
-                    st.code(error_details, language="python")
+            else:
+                st.error(f"❌ {result['error']}")
     
     with col_b:
         # Stop button with rollback option
@@ -540,150 +501,88 @@ if page == "🎯 Scraper Control":
         st.markdown("**🛑 Stop & Keep Data:** Cancels scraping but keeps any new jobs found")
         st.markdown("---")
     
-    # Check if scraper is running
-    if st.session_state.scraper_running and 'scraper_process' in st.session_state:
-        import psutil
-        
-        try:
-            # Check if process is still running
-            if st.session_state.scraper_process:
-                try:
-                    process = psutil.Process(st.session_state.scraper_process)
-                    is_running = process.is_running() and process.status() != psutil.STATUS_ZOMBIE
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    is_running = False
-                
-                if is_running:
-                    # Show running status
-                    st.warning("🟡 Scraper is currently running...")
-                    
-                    # Calculate elapsed time
-                    if 'scraper_start_time' in st.session_state:
-                        elapsed = datetime.now() - st.session_state.scraper_start_time
-                        st.info(f"⏱️ Running for: {elapsed.seconds // 60}m {elapsed.seconds % 60}s")
-                    
-                    # Read current logs from the scraper output
-                    log_file = "data/scraper_live.log"
-                    verified_file = "data/verified/verified_jobs.csv"
-                    jobs_latest_file = "data/jobs_latest.csv"
-                    
-                    # Try to read scraper output
-                    current_logs = []
-                    
-                    # Read log file if it exists
-                    if os.path.exists(log_file):
-                        try:
-                            with open(log_file, 'r') as f:
-                                log_content = f.read()
-                                if log_content.strip():
-                                    current_logs.append("📋 Scraper Output:")
-                                    current_logs.append(log_content)
-                        except:
-                            pass
-                    
-                    # Check scraped jobs file for progress
-                    if os.path.exists(jobs_latest_file):
-                        try:
-                            scraped_df = pd.read_csv(jobs_latest_file)
-                            current_logs.append(f"\n🔍 Total jobs scraped: {len(scraped_df)}")
-                        except:
-                            pass
-                    
-                    # Check verified jobs file for progress
-                    if os.path.exists(verified_file):
-                        try:
-                            temp_df = pd.read_csv(verified_file)
-                            current_logs.append(f"✅ Verified jobs: {len(temp_df)}")
-                            if len(temp_df) > 0:
-                                temp_df['relevance_score'] = pd.to_numeric(temp_df['relevance_score'], errors='coerce').fillna(0)
-                                high_score = len(temp_df[temp_df['relevance_score'] >= 75])
-                                current_logs.append(f"⭐ High score jobs (75+): {high_score}")
-                        except:
-                            pass
-                    
-                    if current_logs:
-                        st.code("\n".join(current_logs), language="text")
-                    else:
-                        st.info("⏳ Scraper is initializing... Logs will appear shortly.")
-                    
-                    # Auto-refresh button
-                    if st.button("🔄 Refresh Now", key="refresh_running"):
-                        st.rerun()
-                    
-                    # Add auto-refresh using st.empty and time
-                    st.info("💡 This page will auto-refresh every 5 seconds. Click 'Refresh Now' for immediate update.")
-                    time.sleep(5)
-                    st.rerun()
-                    
-                else:
-                    # Process completed
-                    st.session_state.scraper_running = False
-                    st.session_state.last_run = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # Read final logs
-                    verified_file = "data/verified/verified_jobs.csv"
-                    if os.path.exists(verified_file):
-                        try:
-                            final_df = pd.read_csv(verified_file)
-                            st.session_state.scraper_logs = [
-                                "✅ Scraper completed successfully!",
-                                f"📊 Total verified jobs: {len(final_df)}",
-                                f"⭐ High score jobs (75+): {len(final_df[final_df['relevance_score'] >= 75])}",
-                                f"✅ Good jobs (60-74): {len(final_df[(final_df['relevance_score'] >= 60) & (final_df['relevance_score'] < 75)])}"
-                            ]
-                        except Exception as e:
-                            st.session_state.scraper_logs = [f"✅ Scraper completed. Check verified jobs file for results."]
-                    else:
-                        st.session_state.scraper_logs = ["✅ Scraper completed."]
-                    
-                    st.success("✅ Scraper completed successfully!")
-                    st.balloons()
-                    st.cache_data.clear()
-                    time.sleep(2)
-                    st.rerun()
-        
-        except ImportError:
-            st.warning("⚠️ psutil not installed. Install it with: pip install psutil")
-            st.info("Assuming scraper completed. Please refresh to see results.")
-            st.session_state.scraper_running = False
-        except Exception as e:
-            st.error(f"❌ Error checking scraper status: {str(e)}")
-            st.session_state.scraper_running = False
     
-    with col_b:
-        if st.button("🗑️ Clear Logs", use_container_width=True):
-            st.session_state.scraper_logs = []
-            st.rerun()
-    
-    # Logs display
-    st.subheader("📋 Scraper Logs")
-    
-    if st.session_state.scraper_logs:
-        log_text = "\n".join(st.session_state.scraper_logs)
-        st.code(log_text, language="text")
-    else:
-        st.info("No logs yet. Run the scraper to see output here.")
-    
-    # Quick stats after run
-    if st.session_state.last_run != "Never":
+    # Progress display
+    if is_scraper_running:
         st.markdown("---")
-        st.subheader("📊 Latest Run Summary")
+        st.subheader("📊 Live Progress")
+        
+        # Progress metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Phase", progress.get("phase", "Unknown").title())
+        with col2:
+            st.metric("Jobs Scraped", progress.get("jobs_scraped", 0))
+        with col3:
+            st.metric("Verified", progress.get("jobs_verified", 0))
+        with col4:
+            st.metric("High Score (75+)", progress.get("high_score_jobs", 0))
+        
+        # Elapsed time
+        if progress.get("start_time"):
+            try:
+                start_time = datetime.fromisoformat(progress["start_time"])
+                elapsed = datetime.now() - start_time
+                minutes = int(elapsed.total_seconds() // 60)
+                seconds = int(elapsed.total_seconds() % 60)
+                st.info(f"⏱️ Running for: {minutes}m {seconds}s")
+            except:
+                pass
+        
+        # Live logs
+        st.markdown("### 📋 Live Logs")
+        logs = scraper.get_logs(tail_lines=30)
+        if logs:
+            st.code(logs, language="text")
+        else:
+            st.info("⏳ Initializing scraper... Logs will appear shortly.")
+        
+        # Auto-refresh
+        st.info("💡 Page auto-refreshes every 5 seconds during scraping")
+        time.sleep(5)
+        st.rerun()
+    
+    # Completed run summary
+    elif progress.get("status") in ["completed", "cancelled"] or (not is_scraper_running and progress.get("jobs_verified", 0) > 0):
+        st.markdown("---")
+        st.subheader("✅ Last Run Summary")
         
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Total Jobs", len(verified_df))
+            st.metric("Jobs Scraped", progress.get("jobs_scraped", 0))
         with col2:
-            if len(verified_df) > 0:
-                high_score = len(verified_df[verified_df['relevance_score'] >= 75])
-                st.metric("High Score (75+)", high_score)
-            else:
-                st.metric("High Score (75+)", 0)
+            st.metric("Verified", progress.get("jobs_verified", 0))
         with col3:
-            st.metric("Emailed", len(history))
+            st.metric("High Score (75+)", progress.get("high_score_jobs", 0))
         with col4:
-            processed = load_processed()
-            st.metric("Total Scanned", len(processed))
+            if progress.get("jobs_verified", 0) > 0:
+                success_rate = (progress.get("high_score_jobs", 0) / progress.get("jobs_verified", 1)) * 100
+                st.metric("Quality Rate", f"{success_rate:.0f}%")
+        
+        # Show logs
+        with st.expander("📋 View Full Logs"):
+            logs = scraper.get_logs(tail_lines=100)
+            if logs:
+                st.code(logs, language="text")
+        
+        # Show rollback info if cancelled
+        if progress.get("status") == "cancelled":
+            if progress.get("rollback_performed"):
+                if progress.get("rollback_success"):
+                    st.success("✅ Data rolled back successfully")
+                else:
+                    st.warning("⚠️ Rollback attempted but failed")
+    
+    # Error state
+    elif progress.get("status") == "error":
+        st.error(f"❌ Scraper Error: {progress.get('error', 'Unknown error')}")
+        
+        with st.expander("🔍 View Logs"):
+            logs = scraper.get_logs()
+            if logs:
+                st.code(logs, language="text")
 
 # --- PAGE 1: Overview ---
 elif page == "📊 Overview":
