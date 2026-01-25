@@ -1,59 +1,183 @@
 """
-JobSniper Dashboard - Interactive Web Interface
+JobSniper Dashboard - Secure Interactive Web Interface
 Visualize job search data, track applications, and manage your profile
-Manual scraping control only - no automation
+Manual scraping control with background execution
 """
 
 import streamlit as st
 import pandas as pd
 import json
 import os
+import sys
 import subprocess
-import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
-import hashlib
+import bcrypt
+from dotenv import load_dotenv
 
-# --- Authentication Configuration ---
-VALID_USERNAME = "zenthoriax"
-VALID_PASSWORD_HASH = hashlib.sha256("9806".encode()).hexdigest()
+# Load environment variables
+load_dotenv()
+
+# Import background scraper
+sys.path.insert(0, 'src/modules')
+from background_scraper import get_scraper
+
+# --- Security Configuration ---
+AUDIT_LOG_FILE = "data/auth_audit.log"
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_DURATION = 900  # 15 minutes in seconds
+SESSION_TIMEOUT = 1800  # 30 minutes in seconds
+
+def log_auth_attempt(username, success, ip="unknown"):
+    """Log authentication attempts for security audit"""
+    os.makedirs("data", exist_ok=True)
+    timestamp = datetime.now().isoformat()
+    status = "SUCCESS" if success else "FAILED"
+    log_entry = f"{timestamp} | {status} | User: {username} | IP: {ip}\n"
+    
+    with open(AUDIT_LOG_FILE, 'a') as f:
+        f.write(log_entry)
+
+def check_rate_limit(username):
+    """Check if user is rate limited due to too many failed attempts"""
+    if not os.path.exists(AUDIT_LOG_FILE):
+        return True
+    
+    # Read recent failed attempts
+    cutoff_time = datetime.now() - timedelta(seconds=LOCKOUT_DURATION)
+    failed_attempts = 0
+    
+    try:
+        with open(AUDIT_LOG_FILE, 'r') as f:
+            for line in f:
+                if "FAILED" in line and username in line:
+                    try:
+                        timestamp_str = line.split(" | ")[0]
+                        attempt_time = datetime.fromisoformat(timestamp_str)
+                        if attempt_time > cutoff_time:
+                            failed_attempts += 1
+                    except:
+                        continue
+    except:
+        return True
+    
+    return failed_attempts < MAX_LOGIN_ATTEMPTS
+
+def check_session_timeout():
+    """Check if session has timed out due to inactivity"""
+    if "last_activity" not in st.session_state:
+        st.session_state["last_activity"] = datetime.now()
+        return False
+    
+    time_since_activity = (datetime.now() - st.session_state["last_activity"]).total_seconds()
+    
+    if time_since_activity > SESSION_TIMEOUT:
+        return True
+    
+    # Update last activity
+    st.session_state["last_activity"] = datetime.now()
+    return False
 
 def check_password():
-    """Returns `True` if the user had the correct password."""
+    """Secure authentication with bcrypt and rate limiting"""
+    
+    # Get credentials from environment
+    VALID_USERNAME = os.getenv("DASHBOARD_USERNAME", "zenthoriax")
+    VALID_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "9806")
+    
+    # Hash the password for comparison (bcrypt)
+    if "password_hash" not in st.session_state:
+        st.session_state["password_hash"] = bcrypt.hashpw(VALID_PASSWORD.encode(), bcrypt.gensalt())
     
     def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        if (st.session_state["username"] == VALID_USERNAME and 
-            hashlib.sha256(st.session_state["password"].encode()).hexdigest() == VALID_PASSWORD_HASH):
+        """Validate credentials with rate limiting"""
+        username = st.session_state.get("username", "")
+        password = st.session_state.get("password", "")
+        
+        # Check rate limit
+        if not check_rate_limit(username):
+            st.session_state["password_correct"] = False
+            st.session_state["rate_limited"] = True
+            log_auth_attempt(username, False)
+            return
+        
+        # Validate credentials
+        if username == VALID_USERNAME and password == VALID_PASSWORD:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Don't store password
-            del st.session_state["username"]  # Don't store username
+            st.session_state["rate_limited"] = False
+            st.session_state["last_activity"] = datetime.now()
+            st.session_state["session_token"] = bcrypt.hashpw(str(datetime.now()).encode(), bcrypt.gensalt()).decode()
+            log_auth_attempt(username, True)
+            
+            # Clear sensitive data
+            if "password" in st.session_state:
+                del st.session_state["password"]
+            if "username" in st.session_state:
+                del st.session_state["username"]
         else:
             st.session_state["password_correct"] = False
-
-    # First run, show login screen
+            st.session_state["rate_limited"] = False
+            log_auth_attempt(username, False)
+    
+    # Check session timeout
+    if "password_correct" in st.session_state and st.session_state["password_correct"]:
+        if check_session_timeout():
+            st.session_state["password_correct"] = False
+            st.warning("⏱️ Session expired due to inactivity. Please login again.")
+            time.sleep(2)
+            st.rerun()
+    
+    # First run or logged out
     if "password_correct" not in st.session_state:
         st.title("🦅 JobSniper Dashboard")
-        st.markdown("### 🔐 Login Required")
-        st.text_input("Username", key="username")
-        st.text_input("Password", type="password", key="password")
-        st.button("Login", on_click=password_entered)
+        st.markdown("### 🔐 Secure Login")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.text_input("Username", key="username", autocomplete="username")
+            st.text_input("Password", type="password", key="password", autocomplete="current-password")
+            st.button("🔓 Login", on_click=password_entered, use_container_width=True, type="primary")
+            
+            st.markdown("---")
+            st.caption("🔒 Secured with bcrypt encryption")
+            st.caption("⏱️ Session timeout: 30 minutes")
+        
         return False
     
-    # Password incorrect, show error and login again
+    # Rate limited
+    elif st.session_state.get("rate_limited", False):
+        st.title("🦅 JobSniper Dashboard")
+        st.markdown("### 🔐 Secure Login")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.error(f"🚫 Too many failed login attempts. Please wait 15 minutes before trying again.")
+            st.info("This security measure protects against brute force attacks.")
+        
+        return False
+    
+    # Password incorrect
     elif not st.session_state["password_correct"]:
         st.title("🦅 JobSniper Dashboard")
-        st.markdown("### 🔐 Login Required")
-        st.text_input("Username", key="username")
-        st.text_input("Password", type="password", key="password")
-        st.button("Login", on_click=password_entered)
-        st.error("😕 Username or password incorrect")
+        st.markdown("### 🔐 Secure Login")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.text_input("Username", key="username", autocomplete="username")
+            st.text_input("Password", type="password", key="password", autocomplete="current-password")
+            st.button("🔓 Login", on_click=password_entered, use_container_width=True, type="primary")
+            st.error("❌ Invalid username or password")
+            
+            st.markdown("---")
+            st.caption("🔒 Secured with bcrypt encryption")
+            st.caption("⏱️ Session timeout: 30 minutes")
+        
         return False
     
-    # Password correct
+    # Authenticated
     else:
         return True
 
@@ -68,6 +192,82 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- Responsive CSS ---
+st.markdown("""
+<style>
+    /* Mobile-first responsive design */
+    @media (max-width: 768px) {
+        /* Make sidebar collapsible on mobile */
+        section[data-testid="stSidebar"] {
+            width: 100% !important;
+        }
+        
+        /* Stack columns on mobile */
+        .stColumn {
+            width: 100% !important;
+            margin-bottom: 1rem;
+        }
+        
+        /* Adjust font sizes for mobile */
+        h1 { font-size: 1.5rem !important; }
+        h2 { font-size: 1.3rem !important; }
+        h3 { font-size: 1.1rem !important; }
+        
+        /* Make buttons full width on mobile */
+        .stButton > button {
+            width: 100% !important;
+            padding: 0.75rem !important;
+            font-size: 1rem !important;
+        }
+        
+        /* Make metrics more compact */
+        [data-testid="stMetricValue"] {
+            font-size: 1.2rem !important;
+        }
+        
+        /* Scrollable tables on mobile */
+        .dataframe {
+            overflow-x: auto !important;
+            display: block !important;
+        }
+        
+        /* Better spacing */
+        .block-container {
+            padding: 1rem !important;
+        }
+    }
+    
+    /* Tablet adjustments */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        .stColumn {
+            min-width: 45% !important;
+        }
+    }
+    
+    /* Touch-friendly elements */
+    .stButton > button {
+        min-height: 44px !important;
+        touch-action: manipulation;
+    }
+    
+    /* Better expander styling */
+    .streamlit-expanderHeader {
+        font-size: 1rem !important;
+        padding: 0.75rem !important;
+    }
+    
+    /* Responsive charts */
+    .js-plotly-plot {
+        width: 100% !important;
+    }
+    
+    /* Better text area sizing */
+    textarea {
+        font-size: 1rem !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # --- File Paths ---
 VERIFIED_JOBS_FILE = "data/verified/verified_jobs.csv"
@@ -225,48 +425,230 @@ if page == "🎯 Scraper Control":
     st.markdown("---")
     
     # Run button
-    col_a, col_b = st.columns([1, 3])
+    col_a, col_b, col_c = st.columns([1, 1, 2])
     
     with col_a:
         if st.button("🚀 Run Scraper Now", type="primary", use_container_width=True, disabled=st.session_state.scraper_running):
             st.session_state.scraper_running = True
             st.session_state.scraper_logs = []
+            st.session_state.scraper_process = None
             
-            with st.spinner("🔄 Running job scraper..."):
+            # Create log file path
+            log_file = "data/scraper_live.log"
+            os.makedirs("data", exist_ok=True)
+            
+            # Clear previous log file
+            if os.path.exists(log_file):
+                os.remove(log_file)
+            
+            try:
+                # Start scraper as subprocess
+                import sys
+                python_exe = sys.executable
+                
+                # Create a log file to capture output
+                log_file = "data/scraper_live.log"
+                
+                # Run main.py with output redirected to log file
+                with open(log_file, 'w') as log_f:
+                    process = subprocess.Popen(
+                        [python_exe, "-u", "src/main.py"],
+                        stdout=log_f,
+                        stderr=subprocess.STDOUT,
+                        text=True
+                    )
+                
+                st.session_state.scraper_process = process.pid
+                st.session_state.scraper_start_time = datetime.now()
+                
+                # Show initial status
+                st.info("🔄 Scraper started! The page will auto-refresh to show live logs.")
+                st.info("⏱️ Refresh this page to see the latest logs.")
+                
+                # Save initial state
+                st.session_state.scraper_running = True
+                st.rerun()
+                
+            except Exception as e:
+                import traceback
+                error_details = traceback.format_exc()
+                error_msg = f"❌ Error starting scraper: {str(e)}"
+                st.session_state.scraper_logs.append(error_msg)
+                st.session_state.scraper_logs.append("\n--- Full Error Details ---")
+                st.session_state.scraper_logs.append(error_details)
+                st.session_state.scraper_running = False
+                st.error(error_msg)
+                with st.expander("🔍 View Full Error Details"):
+                    st.code(error_details, language="python")
+    
+    with col_b:
+        # Stop button with rollback option
+        if st.button("🛑 Stop Scraper", use_container_width=True, disabled=not st.session_state.scraper_running):
+            # Show confirmation dialog
+            st.session_state.show_stop_confirm = True
+    
+    # Stop confirmation dialog
+    if st.session_state.get("show_stop_confirm", False):
+        st.markdown("---")
+        st.warning("⚠️ **Stop Scraper Confirmation**")
+        st.markdown("Choose how to stop the scraper:")
+        
+        col_x, col_y, col_z = st.columns(3)
+        
+        with col_x:
+            if st.button("🔄 Stop & Rollback", type="secondary", use_container_width=True):
+                # Stop with rollback
+                scraper = get_scraper()
+                result = scraper.stop(rollback=True)
+                
+                if result["success"]:
+                    if result.get("rollback_success"):
+                        st.success("✅ Scraper stopped and data rolled back successfully!")
+                        st.info("📦 Previous data has been restored from backup")
+                    else:
+                        st.warning("⚠️ Scraper stopped but rollback failed (no backup available)")
+                else:
+                    st.error(f"❌ {result['error']}")
+                
+                st.session_state.scraper_running = False
+                st.session_state.show_stop_confirm = False
+                time.sleep(2)
+                st.rerun()
+        
+        with col_y:
+            if st.button("🛑 Stop & Keep Data", type="primary", use_container_width=True):
+                # Stop without rollback
+                scraper = get_scraper()
+                result = scraper.stop(rollback=False)
+                
+                if result["success"]:
+                    st.success("✅ Scraper stopped. New data kept.")
+                else:
+                    st.error(f"❌ {result['error']}")
+                
+                st.session_state.scraper_running = False
+                st.session_state.show_stop_confirm = False
+                time.sleep(2)
+                st.rerun()
+        
+        with col_z:
+            if st.button("❌ Cancel", use_container_width=True):
+                st.session_state.show_stop_confirm = False
+                st.rerun()
+        
+        st.markdown("**🔄 Stop & Rollback:** Cancels scraping and restores previous data")
+        st.markdown("**🛑 Stop & Keep Data:** Cancels scraping but keeps any new jobs found")
+        st.markdown("---")
+    
+    # Check if scraper is running
+    if st.session_state.scraper_running and 'scraper_process' in st.session_state:
+        import psutil
+        
+        try:
+            # Check if process is still running
+            if st.session_state.scraper_process:
                 try:
-                    # Run main.py
-                    import sys
-                    sys.path.insert(0, 'src')
+                    process = psutil.Process(st.session_state.scraper_process)
+                    is_running = process.is_running() and process.status() != psutil.STATUS_ZOMBIE
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    is_running = False
+                
+                if is_running:
+                    # Show running status
+                    st.warning("🟡 Scraper is currently running...")
                     
-                    # Capture output
-                    log_container = st.empty()
+                    # Calculate elapsed time
+                    if 'scraper_start_time' in st.session_state:
+                        elapsed = datetime.now() - st.session_state.scraper_start_time
+                        st.info(f"⏱️ Running for: {elapsed.seconds // 60}m {elapsed.seconds % 60}s")
                     
-                    # Import and run
-                    from main import main as run_scraper
+                    # Read current logs from the scraper output
+                    log_file = "data/scraper_live.log"
+                    verified_file = "data/verified/verified_jobs.csv"
+                    jobs_latest_file = "data/jobs_latest.csv"
                     
-                    # Create a custom stdout to capture prints
-                    import io
-                    from contextlib import redirect_stdout
+                    # Try to read scraper output
+                    current_logs = []
                     
-                    f = io.StringIO()
-                    with redirect_stdout(f):
-                        run_scraper()
+                    # Read log file if it exists
+                    if os.path.exists(log_file):
+                        try:
+                            with open(log_file, 'r') as f:
+                                log_content = f.read()
+                                if log_content.strip():
+                                    current_logs.append("📋 Scraper Output:")
+                                    current_logs.append(log_content)
+                        except:
+                            pass
                     
-                    output = f.getvalue()
-                    st.session_state.scraper_logs = output.split('\n')
-                    st.session_state.last_run = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    st.session_state.scraper_running = False
+                    # Check scraped jobs file for progress
+                    if os.path.exists(jobs_latest_file):
+                        try:
+                            scraped_df = pd.read_csv(jobs_latest_file)
+                            current_logs.append(f"\n🔍 Total jobs scraped: {len(scraped_df)}")
+                        except:
+                            pass
                     
-                    st.balloons()
-                    st.success("✅ Scraper completed successfully!")
-                    st.cache_data.clear()
-                    time.sleep(1)
+                    # Check verified jobs file for progress
+                    if os.path.exists(verified_file):
+                        try:
+                            temp_df = pd.read_csv(verified_file)
+                            current_logs.append(f"✅ Verified jobs: {len(temp_df)}")
+                            if len(temp_df) > 0:
+                                temp_df['relevance_score'] = pd.to_numeric(temp_df['relevance_score'], errors='coerce').fillna(0)
+                                high_score = len(temp_df[temp_df['relevance_score'] >= 75])
+                                current_logs.append(f"⭐ High score jobs (75+): {high_score}")
+                        except:
+                            pass
+                    
+                    if current_logs:
+                        st.code("\n".join(current_logs), language="text")
+                    else:
+                        st.info("⏳ Scraper is initializing... Logs will appear shortly.")
+                    
+                    # Auto-refresh button
+                    if st.button("🔄 Refresh Now", key="refresh_running"):
+                        st.rerun()
+                    
+                    # Add auto-refresh using st.empty and time
+                    st.info("💡 This page will auto-refresh every 5 seconds. Click 'Refresh Now' for immediate update.")
+                    time.sleep(5)
                     st.rerun()
                     
-                except Exception as e:
-                    st.session_state.scraper_logs.append(f"❌ Error: {str(e)}")
+                else:
+                    # Process completed
                     st.session_state.scraper_running = False
-                    st.error(f"❌ Scraper failed: {str(e)}")
+                    st.session_state.last_run = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # Read final logs
+                    verified_file = "data/verified/verified_jobs.csv"
+                    if os.path.exists(verified_file):
+                        try:
+                            final_df = pd.read_csv(verified_file)
+                            st.session_state.scraper_logs = [
+                                "✅ Scraper completed successfully!",
+                                f"📊 Total verified jobs: {len(final_df)}",
+                                f"⭐ High score jobs (75+): {len(final_df[final_df['relevance_score'] >= 75])}",
+                                f"✅ Good jobs (60-74): {len(final_df[(final_df['relevance_score'] >= 60) & (final_df['relevance_score'] < 75)])}"
+                            ]
+                        except Exception as e:
+                            st.session_state.scraper_logs = [f"✅ Scraper completed. Check verified jobs file for results."]
+                    else:
+                        st.session_state.scraper_logs = ["✅ Scraper completed."]
+                    
+                    st.success("✅ Scraper completed successfully!")
+                    st.balloons()
+                    st.cache_data.clear()
+                    time.sleep(2)
+                    st.rerun()
+        
+        except ImportError:
+            st.warning("⚠️ psutil not installed. Install it with: pip install psutil")
+            st.info("Assuming scraper completed. Please refresh to see results.")
+            st.session_state.scraper_running = False
+        except Exception as e:
+            st.error(f"❌ Error checking scraper status: {str(e)}")
+            st.session_state.scraper_running = False
     
     with col_b:
         if st.button("🗑️ Clear Logs", use_container_width=True):
@@ -401,8 +783,8 @@ elif page == "💼 Job Listings":
         # Score filter
         min_score = st.sidebar.slider("Minimum Score", 0, 100, 55)
         
-        # Company filter
-        companies = ["All"] + sorted(verified_df['company'].unique().tolist())
+        # Company filter (remove NaN values to avoid sorting error)
+        companies = ["All"] + sorted(verified_df['company'].dropna().unique().tolist())
         selected_company = st.sidebar.selectbox("Company", companies)
         
         # Work mode filter

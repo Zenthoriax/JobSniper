@@ -25,10 +25,10 @@ LOCATIONS = [
 ]
 
 # --- Scraper Settings ---
-HOURS_OLD = 24 
+HOURS_OLD = 72  # Increased from 24 to 72 for wider time window
 
 # Results per query/location/site
-RESULTS_WANTED = 10
+RESULTS_WANTED = 20  # Increased from 10 to 20 for more job discovery
 
 # JobSpy supported sites (5 total for maximum coverage!)
 # Note: Google/Microsoft company career pages need custom scrapers

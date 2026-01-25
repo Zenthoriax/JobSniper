@@ -41,3 +41,12 @@ data/Job_Application_Tracker.xlsx
 
 # Preview/temp files
 data/profile_enhanced_PREVIEW.json
+
+# Deployment and runtime files
+data/backups/
+data/scraper_live.log
+data/scraper_progress.json
+data/scraper.pid
+data/auth_audit.log
+*.pyc
+__pycache__/
