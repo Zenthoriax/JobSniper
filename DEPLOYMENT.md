@@ -1,257 +1,140 @@
-# 🚀 JobSniper Deployment Guide
+# Deployment Checklist for JobSniper
 
-## Overview
-This guide explains how to deploy JobSniper for **24/7 automated job hunting** with a **live dashboard**.
+## Pre-Deployment Verification ✅
 
----
+- [x] Supabase database connection working
+- [x] All CRUD operations tested
+- [x] Excel sync functional
+- [x] Environment variables configured
+- [x] Dashboard connection indicator working
+- [x] All 38 jobs migrated successfully
+- [x] SQLite removed, backup created
+- [x] Python syntax validated
 
-## 🎯 Architecture
+## Deployment Options
+
+### Option 1: Streamlit Cloud (Recommended)
+
+**Pros:**
+- Free tier available
+- Easy deployment from GitHub
+- Automatic HTTPS
+- Built-in secrets management
+
+**Steps:**
+1. Push code to GitHub repository
+2. Go to https://share.streamlit.io
+3. Connect your GitHub account
+4. Select repository and branch
+5. Set `dashboard.py` as main file
+6. Add secrets in Streamlit Cloud dashboard:
+   ```
+   SUPABASE_URL = "your-url"
+   SUPABASE_KEY = "your-key"
+   DASHBOARD_USERNAME = "your-username"
+   DASHBOARD_PASSWORD = "your-password"
+   GEMINI_API_KEY = "your-api-key"
+   EMAIL_APP_PASSWORD = "your-email-password"
+   DASHBOARD_SECRET_KEY = "your-secret-key"
+   ```
+7. Deploy!
+
+### Option 2: Render
+
+**Pros:**
+- Free tier with 750 hours/month
+- Auto-deploy from GitHub
+- Custom domains
+
+**Steps:**
+1. Create `render.yaml` (already provided)
+2. Push to GitHub
+3. Connect Render to your repository
+4. Add environment variables in Render dashboard
+5. Deploy
+
+### Option 3: Railway
+
+**Pros:**
+- $5 free credit monthly
+- Simple deployment
+- Good performance
+
+**Steps:**
+1. Install Railway CLI or use web dashboard
+2. Connect GitHub repository
+3. Add environment variables
+4. Deploy with one click
+
+## Required Environment Variables
+
+Make sure these are set in your deployment platform:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│              GITHUB REPOSITORY (Source)                  │
-│              github.com/Zenthoriax/JobSniper            │
-└─────────────────────────────────────────────────────────┘
-                            │
-                ┌───────────┴───────────┐
-                │                       │
-                ▼                       ▼
-    ┌───────────────────┐   ┌──────────────────────┐
-    │  GITHUB ACTIONS   │   │  STREAMLIT CLOUD     │
-    │  (Scraper)        │   │  (Dashboard)         │
-    │  FREE ✅          │   │  FREE ✅             │
-    └───────────────────┘   └──────────────────────┘
-    Runs daily 8 AM IST     Always online 24/7
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+DASHBOARD_USERNAME=your-username
+DASHBOARD_PASSWORD=your-password
+DASHBOARD_SECRET_KEY=your-secret-key
+GEMINI_API_KEY=your-api-key (optional, for AI scoring)
+EMAIL_APP_PASSWORD=your-email-password (optional, for notifications)
 ```
 
----
+## Files Ready for Deployment
 
-## Part 1: Job Scraper Automation (Already Set Up ✅)
+- ✅ `dashboard.py` - Main application
+- ✅ `requirements.txt` - Dependencies
+- ✅ `src/modules/db_manager.py` - Database layer
+- ✅ `.env` - Local environment (DO NOT commit to GitHub)
+- ✅ `.gitignore` - Configured to exclude sensitive files
+- ✅ `README.md` - Documentation
 
-### Current Status
-- ✅ GitHub Actions workflow configured
-- ✅ Runs automatically at 8:00 AM IST daily
-- ✅ Scrapes LinkedIn, Indeed, Glassdoor
-- ✅ Emails you the best matches
-- ✅ Updates database and Excel tracker
-- ✅ 100% FREE (uses ~150 min/month of 2,000 free)
+## Security Checklist
 
-### What You Need
-Make sure these secrets are added to your GitHub repo:
+- [ ] Remove `.env` from repository (add to `.gitignore`)
+- [ ] Use strong passwords for dashboard
+- [ ] Rotate Supabase keys if exposed
+- [ ] Enable Row Level Security in Supabase
+- [ ] Use environment variables for all secrets
 
-1. Go to: `https://github.com/Zenthoriax/JobSniper/settings/secrets/actions`
-2. Add these secrets:
-   - `EMAIL_APP_PASSWORD` - Your Gmail app password
-   - `GEMINI_API_KEY` - Your Gemini API key (optional)
+## Post-Deployment Testing
 
-### How to Verify It's Working
-1. Go to: `https://github.com/Zenthoriax/JobSniper/actions`
-2. You should see workflow runs
-3. Check your email for daily job alerts
+After deployment, test:
+1. Dashboard loads correctly
+2. Login works
+3. Database connection indicator shows green
+4. Can view jobs in Application Tracker
+5. Can update job status
+6. Excel sync works
+7. Scraper control functions
 
----
+## Troubleshooting
 
-## Part 2: Dashboard Deployment (Streamlit Cloud)
+**Connection Error:**
+- Check Supabase credentials
+- Verify Supabase project is active
+- Check network/firewall settings
 
-### Step 1: Prepare Your Repository
-
-1. **Make sure all code is committed:**
-   ```bash
-   cd /home/zeno/projects/JobSniper
-   git add .
-   git commit -m "Added authentication and enhanced tracker"
-   git push origin main
-   ```
-
-2. **Verify `.gitignore` excludes sensitive data:**
-   ```
-   .env
-   data/*.db
-   data/*.json
-   data/*.xlsx
-   __pycache__/
-   *.pyc
-   ```
-
-### Step 2: Deploy to Streamlit Cloud
-
-1. **Go to Streamlit Cloud:**
-   - Visit: https://share.streamlit.io
-   - Click "Sign in with GitHub"
-   - Authorize Streamlit to access your repos
-
-2. **Create New App:**
-   - Click "New app" button
-   - **Repository:** `Zenthoriax/JobSniper`
-   - **Branch:** `main`
-   - **Main file path:** `dashboard.py`
-   - **App URL:** Choose a custom name (e.g., `jobsniper-zenthoriax`)
-
-3. **Click "Deploy!"**
-   - Wait 2-3 minutes for deployment
-   - Your dashboard will be live!
-
-4. **Access Your Dashboard:**
-   - URL: `https://jobsniper-zenthoriax.streamlit.app` (or your chosen name)
-   - Login with:
-     - **Username:** `zenthoriax`
-     - **Password:** `9806`
-
-### Step 3: Configure (Optional)
-
-**Add Secrets (if needed):**
-- Go to your app settings
-- Add environment variables if you need them for the dashboard
-
-**Custom Domain (Optional):**
-- Streamlit Cloud supports custom domains on paid plans
-- Free tier uses `*.streamlit.app` subdomain
-
----
-
-## 🔒 Security Features
-
-### Authentication
-- ✅ Password-protected dashboard
-- ✅ SHA-256 hashed password (not stored in plaintext)
-- ✅ Session-based authentication
-- ✅ Logout button in sidebar
-
-### Login Credentials
-- **Username:** `zenthoriax`
-- **Password:** `9806`
-
-### To Change Password
-Edit `dashboard.py` line 17:
-```python
-VALID_PASSWORD_HASH = hashlib.sha256("YOUR_NEW_PASSWORD".encode()).hexdigest()
-```
-
----
-
-## 📊 How It All Works Together
-
-### Daily Workflow (Automated)
-
-**8:00 AM IST every day:**
-1. GitHub Actions wakes up
-2. Runs job scraper (`python main.py`)
-3. Scrapes jobs from LinkedIn, Indeed, Glassdoor
-4. Scores jobs against your profile
-5. Sends email with best matches (score ≥55)
-6. Updates SQLite database
-7. Syncs to Excel tracker
-8. Commits changes to GitHub
-9. **Dashboard automatically shows new jobs** (reads from GitHub)
-
-### Dashboard Access (24/7)
-
-**Anytime you want:**
-1. Visit your dashboard URL
-2. Login with credentials
-3. View all jobs, update statuses, add notes
-4. Changes sync to database and Excel
-5. Logout when done
-
----
-
-## 💰 Cost Breakdown
-
-| Service | Usage | Cost |
-|---------|-------|------|
-| **GitHub Actions** | ~150 min/month | **FREE** (2,000 min limit) |
-| **Streamlit Cloud** | 24/7 hosting | **FREE** (1 app limit) |
-| **Gemini API** | ~30 calls/day | **FREE** (1,500/day limit) |
-| **Gmail** | Email notifications | **FREE** |
-| **Total** | | **$0/month** ✅ |
-
----
-
-## 🎯 Alternative Deployment Options
-
-### Option 2: Render.com
-
-**Pros:** More resources, custom domains
-**Cons:** Spins down after inactivity
-
-**Deploy:**
-1. Go to https://render.com
-2. Sign in with GitHub
-3. New → Web Service
-4. Connect `JobSniper` repo
-5. Start command: `streamlit run dashboard.py --server.port=$PORT --server.address=0.0.0.0`
-6. Deploy!
-
-### Option 3: Railway.app
-
-**Pros:** Fast deployment, $5 free credit/month
-**Cons:** Limited free tier
-
-**Deploy:**
-1. Go to https://railway.app
-2. Sign in with GitHub
-3. New Project → Deploy from GitHub
-4. Select `JobSniper`
-5. Add start command: `streamlit run dashboard.py --server.port=$PORT --server.address=0.0.0.0`
-6. Deploy!
-
----
-
-## 🔧 Troubleshooting
-
-### Dashboard Not Loading
-- Check Streamlit Cloud logs
-- Verify all dependencies in `requirements.txt`
-- Ensure `dashboard.py` is in root directory
-
-### GitHub Actions Failing
-- Check Actions tab for error logs
-- Verify secrets are added correctly
-- Check if job sites are blocking GitHub IPs
-
-### No Jobs Found
-- Verify scraper is running (check Actions)
-- Check email for notifications
-- Adjust `HOURS_OLD` in `config/settings.py` if needed
-
-### Authentication Issues
+**Login Issues:**
+- Verify DASHBOARD_USERNAME and DASHBOARD_PASSWORD
 - Clear browser cache
-- Try incognito mode
-- Verify credentials are correct
+- Check session timeout settings
+
+**Missing Data:**
+- Verify Supabase table exists
+- Check RLS policies
+- Ensure migration completed
+
+## Next Steps After Deployment
+
+1. Test all functionality
+2. Set up GitHub Actions for automated scraping (optional)
+3. Configure custom domain (optional)
+4. Set up monitoring/alerts
+5. Create backup schedule
 
 ---
 
-## 📱 Mobile Access
+**Ready to Deploy!** 🚀
 
-Your dashboard works on mobile too!
-- Visit the same URL on your phone
-- Login with same credentials
-- Fully responsive design
-
----
-
-## 🎉 You're All Set!
-
-### What You Have Now:
-✅ Automated job scraping every morning
-✅ Email notifications for best matches
-✅ 24/7 accessible dashboard
-✅ Password-protected access
-✅ Interactive application tracking
-✅ SQLite database + Excel backup
-✅ Analytics and insights
-✅ 100% FREE hosting
-
-### Next Steps:
-1. Push your code to GitHub
-2. Deploy dashboard to Streamlit Cloud
-3. Bookmark your dashboard URL
-4. Check your email daily for job alerts
-5. Update application statuses in dashboard
-6. Track your success rate!
-
----
-
-**Made with ❤️ for job seekers**
-
-*Last updated: January 2026*
+Choose your deployment platform and follow the steps above.

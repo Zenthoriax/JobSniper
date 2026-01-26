@@ -1,15 +1,27 @@
 """
 Database Manager for JobSniper Application Tracker
-Handles SQLite database operations and Excel synchronization
+Handles Supabase cloud database operations and Excel synchronization
 """
 
-import sqlite3
 import pandas as pd
 import os
 from datetime import datetime
 from typing import List, Dict, Optional
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
-DB_FILE = "data/job_tracker.db"
+# Load environment variables
+load_dotenv()
+
+# Supabase configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+# Initialize Supabase client
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 EXCEL_FILE = "data/Job_Application_Tracker.xlsx"
 
 # Status options
@@ -23,98 +35,108 @@ VALID_STATUSES = [
 ]
 
 def init_db():
-    """Initialize the SQLite database with the jobs table"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    """Initialize the Supabase database with the jobs table"""
+    if not supabase:
+        raise Exception("Supabase client not initialized. Please set SUPABASE_URL and SUPABASE_KEY in .env file")
     
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company TEXT NOT NULL,
-            role TEXT NOT NULL,
-            location TEXT,
-            duration TEXT,
-            link TEXT UNIQUE NOT NULL,
-            match_score REAL,
-            status TEXT DEFAULT 'Not Applied',
-            notes TEXT,
-            date_found TEXT,
-            date_applied TEXT,
-            date_updated TEXT,
-            CONSTRAINT valid_status CHECK (status IN ('Not Applied', 'Applied', 'Ongoing', 'Interviewing', 'Got Selected', 'Rejected'))
-        )
-    """)
-    
-    conn.commit()
-    conn.close()
-    print("✅ Database initialized")
+    # Note: Table creation should be done via Supabase dashboard or migration script
+    # This function verifies the connection
+    try:
+        # Test connection by querying the table
+        result = supabase.table('jobs').select("id").limit(1).execute()
+        print("✅ Supabase database connection successful")
+        return True
+    except Exception as e:
+        print(f"⚠️ Database connection error: {e}")
+        print("💡 Make sure the 'jobs' table exists in Supabase")
+        return False
 
 def add_job(company: str, role: str, link: str, match_score: float, 
             location: str = None, duration: str = None) -> bool:
     """Add a new job to the database"""
+    if not supabase:
+        print("Error: Supabase client not initialized")
+        return False
+    
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
         date_found = datetime.now().strftime("%Y-%m-%d")
         
-        cursor.execute("""
-            INSERT INTO jobs (company, role, location, duration, link, match_score, 
-                            status, date_found, date_updated)
-            VALUES (?, ?, ?, ?, ?, ?, 'Not Applied', ?, ?)
-        """, (company, role, location, duration, link, match_score, date_found, date_found))
+        job_data = {
+            "company": company,
+            "role": role,
+            "location": location,
+            "duration": duration,
+            "link": link,
+            "match_score": match_score,
+            "status": "Not Applied",
+            "date_found": date_found,
+            "date_updated": date_found
+        }
         
-        conn.commit()
-        conn.close()
+        result = supabase.table('jobs').insert(job_data).execute()
         return True
-    except sqlite3.IntegrityError:
-        # Job already exists (duplicate link)
-        return False
     except Exception as e:
+        # Check if it's a duplicate link error
+        if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+            return False
         print(f"Error adding job: {e}")
         return False
 
 def get_all_jobs() -> pd.DataFrame:
     """Get all jobs from the database as a DataFrame"""
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query("SELECT * FROM jobs ORDER BY date_found DESC, match_score DESC", conn)
-    conn.close()
-    return df
+    if not supabase:
+        print("Error: Supabase client not initialized")
+        return pd.DataFrame()
+    
+    try:
+        result = supabase.table('jobs').select("*").order('date_found', desc=True).order('match_score', desc=True).execute()
+        
+        if result.data:
+            df = pd.DataFrame(result.data)
+            return df
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error getting jobs: {e}")
+        return pd.DataFrame()
 
 def get_jobs_by_status(status: str) -> pd.DataFrame:
     """Get jobs filtered by status"""
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query("SELECT * FROM jobs WHERE status = ? ORDER BY date_found DESC", conn, params=(status,))
-    conn.close()
-    return df
+    if not supabase:
+        print("Error: Supabase client not initialized")
+        return pd.DataFrame()
+    
+    try:
+        result = supabase.table('jobs').select("*").eq('status', status).order('date_found', desc=True).execute()
+        
+        if result.data:
+            return pd.DataFrame(result.data)
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error getting jobs by status: {e}")
+        return pd.DataFrame()
 
 def update_job_status(job_id: int, new_status: str) -> bool:
     """Update the status of a job"""
     if new_status not in VALID_STATUSES:
         return False
     
+    if not supabase:
+        print("Error: Supabase client not initialized")
+        return False
+    
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
         date_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        update_data = {
+            "status": new_status,
+            "date_updated": date_updated
+        }
         
         # If status is "Applied", also set date_applied
         if new_status == "Applied":
-            cursor.execute("""
-                UPDATE jobs 
-                SET status = ?, date_applied = ?, date_updated = ?
-                WHERE id = ?
-            """, (new_status, datetime.now().strftime("%Y-%m-%d"), date_updated, job_id))
-        else:
-            cursor.execute("""
-                UPDATE jobs 
-                SET status = ?, date_updated = ?
-                WHERE id = ?
-            """, (new_status, date_updated, job_id))
+            update_data["date_applied"] = datetime.now().strftime("%Y-%m-%d")
         
-        conn.commit()
-        conn.close()
+        result = supabase.table('jobs').update(update_data).eq('id', job_id).execute()
         return True
     except Exception as e:
         print(f"Error updating status: {e}")
@@ -122,20 +144,19 @@ def update_job_status(job_id: int, new_status: str) -> bool:
 
 def update_job_notes(job_id: int, notes: str) -> bool:
     """Update notes for a job"""
+    if not supabase:
+        print("Error: Supabase client not initialized")
+        return False
+    
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
         date_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        cursor.execute("""
-            UPDATE jobs 
-            SET notes = ?, date_updated = ?
-            WHERE id = ?
-        """, (notes, date_updated, job_id))
+        update_data = {
+            "notes": notes,
+            "date_updated": date_updated
+        }
         
-        conn.commit()
-        conn.close()
+        result = supabase.table('jobs').update(update_data).eq('id', job_id).execute()
         return True
     except Exception as e:
         print(f"Error updating notes: {e}")
@@ -143,12 +164,12 @@ def update_job_notes(job_id: int, notes: str) -> bool:
 
 def delete_job(job_id: int) -> bool:
     """Delete a job from the database"""
+    if not supabase:
+        print("Error: Supabase client not initialized")
+        return False
+    
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
-        conn.commit()
-        conn.close()
+        result = supabase.table('jobs').delete().eq('id', job_id).execute()
         return True
     except Exception as e:
         print(f"Error deleting job: {e}")
@@ -156,39 +177,51 @@ def delete_job(job_id: int) -> bool:
 
 def get_statistics() -> Dict:
     """Get statistics about applications"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    if not supabase:
+        print("Error: Supabase client not initialized")
+        return {}
     
-    stats = {}
-    
-    # Total jobs
-    cursor.execute("SELECT COUNT(*) FROM jobs")
-    stats['total_jobs'] = cursor.fetchone()[0]
-    
-    # Count by status
-    for status in VALID_STATUSES:
-        cursor.execute("SELECT COUNT(*) FROM jobs WHERE status = ?", (status,))
-        stats[status.lower().replace(' ', '_')] = cursor.fetchone()[0]
-    
-    # Average match score
-    cursor.execute("SELECT AVG(match_score) FROM jobs")
-    avg_score = cursor.fetchone()[0]
-    stats['avg_match_score'] = round(avg_score, 1) if avg_score else 0
-    
-    # Success rate (Got Selected / Applied)
-    applied = stats['applied'] + stats['ongoing'] + stats['interviewing'] + stats['got_selected'] + stats['rejected']
-    if applied > 0:
-        stats['success_rate'] = round((stats['got_selected'] / applied) * 100, 1)
-    else:
-        stats['success_rate'] = 0
-    
-    conn.close()
-    return stats
+    try:
+        # Get all jobs for statistics
+        all_jobs = get_all_jobs()
+        
+        stats = {}
+        
+        # Total jobs
+        stats['total_jobs'] = len(all_jobs)
+        
+        # Count by status
+        for status in VALID_STATUSES:
+            status_key = status.lower().replace(' ', '_')
+            stats[status_key] = len(all_jobs[all_jobs['status'] == status]) if len(all_jobs) > 0 else 0
+        
+        # Average match score
+        if len(all_jobs) > 0:
+            avg_score = all_jobs['match_score'].mean()
+            stats['avg_match_score'] = round(avg_score, 1) if pd.notna(avg_score) else 0
+        else:
+            stats['avg_match_score'] = 0
+        
+        # Success rate (Got Selected / Applied)
+        applied = stats['applied'] + stats['ongoing'] + stats['interviewing'] + stats['got_selected'] + stats['rejected']
+        if applied > 0:
+            stats['success_rate'] = round((stats['got_selected'] / applied) * 100, 1)
+        else:
+            stats['success_rate'] = 0
+        
+        return stats
+    except Exception as e:
+        print(f"Error getting statistics: {e}")
+        return {}
 
 def sync_from_excel():
     """Import jobs from Excel to database (one-time migration)"""
     if not os.path.exists(EXCEL_FILE):
         print("No Excel file found to sync from")
+        return
+    
+    if not supabase:
+        print("Error: Supabase client not initialized")
         return
     
     try:
@@ -207,13 +240,11 @@ def sync_from_excel():
             
             # Update status if it exists
             if 'Status' in row and pd.notna(row['Status']):
-                conn = sqlite3.connect(DB_FILE)
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE jobs SET status = ? WHERE link = ?
-                """, (row['Status'], row['Link']))
-                conn.commit()
-                conn.close()
+                # Find the job we just added by link
+                result = supabase.table('jobs').select("id").eq('link', row['Link']).execute()
+                if result.data and len(result.data) > 0:
+                    job_id = result.data[0]['id']
+                    update_job_status(job_id, row['Status'])
         
         print(f"✅ Synced {len(df)} jobs from Excel to database")
     except Exception as e:
@@ -223,6 +254,10 @@ def sync_to_excel():
     """Export database to Excel (for compatibility)"""
     try:
         df = get_all_jobs()
+        
+        if len(df) == 0:
+            print("No jobs to sync to Excel")
+            return
         
         # Reorder and rename columns to match Excel format
         export_df = pd.DataFrame()
@@ -254,9 +289,9 @@ def sync_to_excel():
     except Exception as e:
         print(f"Error syncing to Excel: {e}")
 
-# Initialize database on import
-if not os.path.exists(DB_FILE):
+# Initialize database connection on import
+if SUPABASE_URL and SUPABASE_KEY:
     init_db()
-    # If Excel exists, migrate data
-    if os.path.exists(EXCEL_FILE):
-        sync_from_excel()
+else:
+    print("⚠️ Supabase credentials not found in .env file")
+    print("Please add SUPABASE_URL and SUPABASE_KEY to your .env file")

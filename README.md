@@ -12,11 +12,12 @@ An intelligent job scraping and matching system that finds relevant AI/ML intern
   - 🎯 Scraper Control - Run jobs manually with real-time logs
   - 📊 Overview - Quick stats and recent jobs
   - 💼 Job Listings - Searchable and filterable job table
-  - 📋 Application Tracker - Manage applications with SQLite + Excel sync
+  - 📋 Application Tracker - Manage applications with Supabase cloud database + Excel sync
   - 📈 Analytics - Visualize job market trends
   - 👤 Profile - Manage your skills and preferences
 - **Duplicate Prevention**: Tracks processed jobs and auto-cleans old entries
-- **Dual Storage**: SQLite database + Excel tracker for compatibility
+- **Cloud Storage**: Supabase PostgreSQL database + Excel tracker for compatibility
+- **Live Connection Status**: Real-time database connection indicator in dashboard
 
 ## 📋 What's New in v3.0
 
@@ -63,9 +64,27 @@ pip install -r requirements.txt
 
 #### A. Create `.env` file in project root:
 ```env
-EMAIL_APP_PASSWORD=your_gmail_app_password
-GEMINI_API_KEY=your_gemini_api_key  # Optional, for AI-powered matching
+# Supabase Configuration (Required)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+
+# Dashboard Authentication
+DASHBOARD_USERNAME=zenthoriax
+DASHBOARD_PASSWORD=9806
+DASHBOARD_SECRET_KEY=your-secret-key
+
+# Optional Features
+EMAIL_APP_PASSWORD=your_gmail_app_password  # For email notifications
+GEMINI_API_KEY=your_gemini_api_key  # For AI-powered matching
 ```
+
+**Setting up Supabase:**
+1. Go to [supabase.com](https://supabase.com) and create a free account
+2. Create a new project
+3. Go to Project Settings → API
+4. Copy your Project URL and anon/public key
+5. Run the SQL from `supabase_schema.sql` in the SQL Editor
+6. See `SUPABASE_SETUP.md` for detailed instructions
 
 **Getting Gmail App Password:**
 1. Go to Google Account → Security
@@ -150,7 +169,8 @@ The dashboard will open in your browser at `http://localhost:8501`
 - Filter by status (Applied, Interview, Rejected, etc.)
 - Add notes to each application
 - Update status with dropdown
-- Syncs to both SQLite database and Excel
+- Syncs to Supabase cloud database and Excel
+- Real-time updates across all devices
 
 ### 📈 Analytics
 - Score distribution histogram
@@ -271,8 +291,7 @@ JobSniper/
 │   ├── history.json            # Emailed jobs
 │   ├── processed.json          # All checked jobs
 │   ├── processed_metadata.json # Timestamps for cleanup
-│   ├── job_tracker.db          # SQLite database
-│   ├── Job_Application_Tracker.xlsx
+│   ├── Job_Application_Tracker.xlsx  # Excel export
 │   ├── raw/
 │   │   └── jobs_latest.csv     # Scraped jobs
 │   └── verified/
@@ -284,7 +303,9 @@ JobSniper/
 │       ├── auditor.py          # Job scoring
 │       ├── notifier.py         # Email alerts
 │       ├── tracker.py          # Excel updates
-│       └── db_manager.py       # SQLite operations
+│       └── db_manager.py       # Supabase operations
+├── supabase_schema.sql         # Database schema
+├── DEPLOYMENT.md               # Deployment guide
 ├── dashboard.py                # Streamlit dashboard
 ├── requirements.txt
 └── README.md
@@ -357,4 +378,4 @@ MIT License - feel free to use and modify
 
 **Made with ❤️ for job seekers**
 
-*Last updated: January 2026 - v3.0 Manual Control Edition*
+*Last updated: January 2026 - v4.0 Cloud Edition with Supabase*

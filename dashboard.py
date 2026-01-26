@@ -24,10 +24,6 @@ load_dotenv()
 # Import background scraper
 sys.path.insert(0, 'src/modules')
 from background_scraper import get_scraper
-from db_connector import get_db
-
-# Initialize database (auto-creates tables if needed)
-db = get_db()
 
 # --- Security Configuration ---
 AUDIT_LOG_FILE = "data/auth_audit.log"
@@ -284,16 +280,12 @@ SCRAPER_LOG_FILE = "data/scraper_log.txt"
 # --- Helper Functions ---
 @st.cache_data(ttl=60)
 def load_verified_jobs():
-    """Load verified jobs from database or CSV fallback"""
-    # Try database first
-    df = db.get_verified_jobs()
-    
-    # If database returns empty and CSV exists, use CSV as fallback
-    if df.empty and os.path.exists(VERIFIED_JOBS_FILE):
+    """Load verified jobs from CSV"""
+    if os.path.exists(VERIFIED_JOBS_FILE):
         df = pd.read_csv(VERIFIED_JOBS_FILE)
         df['relevance_score'] = pd.to_numeric(df['relevance_score'], errors='coerce').fillna(0)
-    
-    return df
+        return df
+    return pd.DataFrame()
 
 @st.cache_data(ttl=60)
 def load_tracker():
@@ -348,6 +340,23 @@ def load_config():
 # --- Sidebar ---
 st.sidebar.title("🦅 JobSniper")
 st.sidebar.markdown("**Manual Job Hunter**")
+
+# Database Connection Status
+try:
+    from src.modules.db_manager import supabase
+    if supabase:
+        # Test connection
+        try:
+            test_result = supabase.table('jobs').select("id").limit(1).execute()
+            st.sidebar.success("🟢 Supabase Connected")
+        except Exception as e:
+            st.sidebar.error("🔴 Database Error")
+            st.sidebar.caption(f"Error: {str(e)[:50]}...")
+    else:
+        st.sidebar.warning("🟡 No Database Config")
+except Exception as e:
+    st.sidebar.error("🔴 Connection Failed")
+
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
@@ -357,12 +366,27 @@ page = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Quick Stats")
-verified_df = load_verified_jobs()
-history = load_history()
-st.sidebar.metric("Total Jobs Found", len(verified_df))
-st.sidebar.metric("Jobs Emailed", len(history))
-if len(verified_df) > 0:
-    st.sidebar.metric("Avg Match Score", f"{verified_df['relevance_score'].mean():.1f}/100")
+
+# Get data from Supabase instead of verified CSV for accurate stats
+try:
+    from src.modules.db_manager import get_all_jobs, get_statistics
+    
+    # Get jobs from Supabase
+    tracker_jobs = get_all_jobs()
+    stats = get_statistics()
+    
+    st.sidebar.metric("Jobs in Tracker", stats.get('total_jobs', 0))
+    st.sidebar.metric("Not Applied", stats.get('not_applied', 0))
+    if stats.get('total_jobs', 0) > 0:
+        st.sidebar.metric("Avg Match Score", f"{stats.get('avg_match_score', 0):.1f}/100")
+except Exception as e:
+    # Fallback to old method if Supabase fails
+    verified_df = load_verified_jobs()
+    history = load_history()
+    st.sidebar.metric("Total Jobs Found", len(verified_df))
+    st.sidebar.metric("Jobs Emailed", len(history))
+    if len(verified_df) > 0:
+        st.sidebar.metric("Avg Match Score", f"{verified_df['relevance_score'].mean():.1f}/100")
 
 # Logout button
 st.sidebar.markdown("---")
@@ -375,33 +399,7 @@ if page == "🎯 Scraper Control":
     st.title("🎯 Manual Scraper Control")
     st.markdown("### Run job scraping manually from this dashboard")
     
-    # Configuration Display
-    st.subheader("⚙️ Current Configuration")
-    config = load_config()
-    
-    if config:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**🔍 Search Queries:**")
-            for query in config.get('queries', []):
-                st.markdown(f"- {query}")
-            
-            st.markdown("**📍 Locations:**")
-            for loc in config.get('locations', []):
-                st.markdown(f"- {loc}")
-        
-        with col2:
-            st.markdown("**🌐 Job Sites:**")
-            for site in config.get('sites', []):
-                st.markdown(f"- {site.title()}")
-            
-            st.markdown(f"**⏰ Freshness:** Last {config.get('hours_old', 24)} hours")
-            st.markdown(f"**🤖 AI Scoring:** {'Enabled (Gemini)' if config.get('use_gemini', False) else 'Disabled (Local)'}")
-            st.markdown(f"**🌍 Country:** {config.get('country', 'India')}")
-    
-    st.markdown("---")
-    
+
     # Scraper Control
     st.subheader("🚀 Run Scraper")
     
@@ -1046,6 +1044,8 @@ elif page == "👤 Profile":
         st.markdown("---")
         st.subheader("📄 Current Profile JSON")
         st.json(profile)
+
+
 
 # --- Footer ---
 st.sidebar.markdown("---")
