@@ -139,7 +139,7 @@ def check_password():
         with col2:
             st.text_input("Username", key="username", autocomplete="username")
             st.text_input("Password", type="password", key="password", autocomplete="current-password")
-            st.button("🔓 Login", on_click=password_entered, use_container_width=True, type="primary")
+            st.button("🔓 Login", on_click=password_entered, width="stretch", type="primary")
             
             st.markdown("---")
             st.caption("🔒 Secured with bcrypt encryption")
@@ -168,7 +168,7 @@ def check_password():
         with col2:
             st.text_input("Username", key="username", autocomplete="username")
             st.text_input("Password", type="password", key="password", autocomplete="current-password")
-            st.button("🔓 Login", on_click=password_entered, use_container_width=True, type="primary")
+            st.button("🔓 Login", on_click=password_entered, width="stretch", type="primary")
             st.error("❌ Invalid username or password")
             
             st.markdown("---")
@@ -428,7 +428,7 @@ if page == "🎯 Scraper Control":
             st.markdown("**Last Run:** Never")
     
     with col3:
-        if st.button("🔄 Refresh", use_container_width=True):
+        if st.button("🔄 Refresh", width="stretch"):
             st.cache_data.clear()
             st.rerun()
     
@@ -438,7 +438,7 @@ if page == "🎯 Scraper Control":
     col_a, col_b, col_c = st.columns([1, 1, 2])
     
     with col_a:
-        if st.button("🚀 Run Scraper Now", type="primary", use_container_width=True, disabled=is_scraper_running):
+        if st.button("🚀 Run Scraper Now", type="primary", width="stretch", disabled=is_scraper_running):
             result = scraper.start()
             if result["success"]:
                 st.success("✅ Scraper started in background!")
@@ -450,7 +450,7 @@ if page == "🎯 Scraper Control":
     
     with col_b:
         # Stop button with rollback option
-        if st.button("🛑 Stop Scraper", use_container_width=True, disabled=not is_scraper_running):
+        if st.button("🛑 Stop Scraper", width="stretch", disabled=not is_scraper_running):
             # Show confirmation dialog
             st.session_state.show_stop_confirm = True
     
@@ -463,7 +463,7 @@ if page == "🎯 Scraper Control":
         col_x, col_y, col_z = st.columns(3)
         
         with col_x:
-            if st.button("🔄 Stop & Rollback", type="secondary", use_container_width=True):
+            if st.button("🔄 Stop & Rollback", type="secondary", width="stretch"):
                 # Stop with rollback
                 scraper = get_scraper()
                 result = scraper.stop(rollback=True)
@@ -482,7 +482,7 @@ if page == "🎯 Scraper Control":
                 st.rerun()
         
         with col_y:
-            if st.button("🛑 Stop & Keep Data", type="primary", use_container_width=True):
+            if st.button("🛑 Stop & Keep Data", type="primary", width="stretch"):
                 # Stop without rollback
                 scraper = get_scraper()
                 result = scraper.stop(rollback=False)
@@ -497,7 +497,7 @@ if page == "🎯 Scraper Control":
                 st.rerun()
         
         with col_z:
-            if st.button("❌ Cancel", use_container_width=True):
+            if st.button("❌ Cancel", width="stretch"):
                 st.session_state.show_stop_confirm = False
                 st.rerun()
         
@@ -647,17 +647,17 @@ elif page == "📊 Overview":
     col_a, col_b, col_c = st.columns([1, 1, 1])
     
     with col_a:
-        if st.button("🚀 Go to Scraper Control", type="primary", use_container_width=True):
+        if st.button("🚀 Go to Scraper Control", type="primary", width="stretch"):
             st.session_state.page = "🎯 Scraper Control"
             st.rerun()
     
     with col_b:
-        if st.button("🔄 Refresh Dashboard", use_container_width=True):
+        if st.button("🔄 Refresh Dashboard", width="stretch"):
             st.cache_data.clear()
             st.rerun()
     
     with col_c:
-        if st.button("📧 Email History", use_container_width=True):
+        if st.button("📧 Email History", width="stretch"):
             st.info(f"Total emails sent: {len(history)}")
     
     st.markdown("---")
@@ -919,7 +919,7 @@ elif page == "📋 Application Tracker":
             display_df = filtered_jobs[['company', 'role', 'location', 'match_score', 'date_found', 'link']]
             st.dataframe(
                 display_df,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 column_config={
                     "link": st.column_config.LinkColumn("Apply Link"),
@@ -939,7 +939,7 @@ elif page == "📋 Application Tracker":
         with col1:
             st.markdown("### 🔄 Sync to Excel")
             st.markdown("Export all database entries to Excel file")
-            if st.button("📊 Sync to Excel Now", use_container_width=True):
+            if st.button("📊 Sync to Excel Now", width="stretch"):
                 sync_to_excel()
                 st.success("✅ Synced to Excel successfully!")
         
@@ -967,7 +967,7 @@ elif page == "📈 Analytics":
             labels={'relevance_score': 'Match Score', 'count': 'Number of Jobs'},
             color_discrete_sequence=['#1f77b4']
         )
-        st.plotly_chart(fig_score, use_container_width=True)
+        st.plotly_chart(fig_score, width="stretch")
         
         col1, col2 = st.columns(2)
         
@@ -984,7 +984,7 @@ elif page == "📈 Analytics":
                 color_discrete_sequence=['#2ecc71']
             )
             fig_companies.update_layout(showlegend=False)
-            st.plotly_chart(fig_companies, use_container_width=True)
+            st.plotly_chart(fig_companies, width="stretch")
         
         with col2:
             # Work Mode Distribution
@@ -997,7 +997,7 @@ elif page == "📈 Analytics":
                     title="Remote vs On-site vs Hybrid",
                     color_discrete_sequence=px.colors.qualitative.Set3
                 )
-                st.plotly_chart(fig_mode, use_container_width=True)
+                st.plotly_chart(fig_mode, width="stretch")
         
         # Key Insights
         st.subheader("💡 Key Insights")
@@ -1059,7 +1059,7 @@ elif page == "👤 Profile":
                 min_duration = st.text_input("Minimum Duration", value=prefs.get('min_duration', ''))
         
         # Save Button
-        if st.button("💾 Save Profile", type="primary", use_container_width=True):
+        if st.button("💾 Save Profile", type="primary", width="stretch"):
             # Update profile
             profile['name'] = name
             profile['target_role'] = target_role
