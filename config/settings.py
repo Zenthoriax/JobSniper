@@ -30,15 +30,15 @@ HOURS_OLD = 72  # Increased from 24 to 72 for wider time window
 # Results per query/location/site
 RESULTS_WANTED = 20  # Increased from 10 to 20 for more job discovery
 
-# JobSpy supported sites (5 total for maximum coverage!)
-# Note: Google/Microsoft company career pages need custom scrapers
-# But these sites already show Google/Microsoft job postings
+# Job sites to scrape
+# Note: Some sites may block automated requests (403 errors)
+# Glassdoor and ZipRecruiter currently blocked - disabled
 TARGET_SITES = [
-    "linkedin",        # Professional network, has Google/MS jobs
-    "indeed",          # Largest job board, has Google/MS jobs
-    "glassdoor",       # Company reviews + salaries + jobs
-    "zip_recruiter",   # Good for remote jobs
-    "google"           # Google Jobs (aggregates from multiple sources including Google Careers!)
+    "linkedin",        # Professional network - Working
+    "indeed",          # Largest job board - Working  
+    # "glassdoor",     # DISABLED - Returns 403 errors
+    # "zip_recruiter", # DISABLED - Returns 403 errors
+    "google"           # Google Jobs aggregator - Working
 ]
 
 # --- Runtime flags ---
