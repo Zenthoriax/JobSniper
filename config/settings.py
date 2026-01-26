@@ -1,43 +1,47 @@
 import os
 
 # --- Search Configuration ---
-# Focus on remote opportunities and India tech hubs
+# Broader search queries to capture more opportunities
 SEARCH_QUERIES = [
-    "AI Intern Remote",
-    "Machine Learning Intern Remote",
-    "Data Science Intern Remote",
     "AI Intern",
+    "Machine Learning Intern",
+    "Data Science Intern",
     "ML Intern",
-    "Data Science Intern"
+    "Artificial Intelligence Intern",
+    "Deep Learning Intern",
+    "AI/ML Intern",
+    "Data Analyst Intern",
+    "Python Developer Intern",
+    "Software Engineer Intern AI"
 ]
 
 # India for local opportunities
 COUNTRY = 'India' 
 
-# Priority: Remote first, then India tech hubs
+# Expanded locations for more coverage
 LOCATIONS = [
-    "Remote",              # Priority 1: Remote (global, includes US)
-    "Bangalore",           # Priority 2: India tech hubs
-    "Kochi",
-    "Chennai",
+    "Remote",              # Priority 1: Remote (global)
+    "India",               # Broad India search
+    "Bangalore",           # Tech hubs
+    "Mumbai",
     "Hyderabad", 
-    "Pune"
+    "Pune",
+    "Delhi",
+    "Chennai"
 ]
 
 # --- Scraper Settings ---
-HOURS_OLD = 72  # Increased from 24 to 72 for wider time window
+# Increased time window to find more jobs
+HOURS_OLD = 168  # 7 days (was 72) - much wider window
 
-# Results per query/location/site
-RESULTS_WANTED = 20  # Increased from 10 to 20 for more job discovery
+# Increased results per query
+RESULTS_WANTED = 50  # Increased from 20 to 50 for maximum discovery
 
-# Job sites to scrape
-# Note: Some sites may block automated requests (403 errors)
-# Glassdoor and ZipRecruiter currently blocked - disabled
+# Job sites - only working ones
+# Note: Glassdoor and ZipRecruiter disabled due to 403 blocking
 TARGET_SITES = [
     "linkedin",        # Professional network - Working
     "indeed",          # Largest job board - Working  
-    # "glassdoor",     # DISABLED - Returns 403 errors
-    # "zip_recruiter", # DISABLED - Returns 403 errors
     "google"           # Google Jobs aggregator - Working
 ]
 
