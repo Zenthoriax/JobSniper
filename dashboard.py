@@ -590,8 +590,22 @@ if page == "🎯 Scraper Control":
 
 # --- PAGE 1: Overview ---
 elif page == "📊 Overview":
-    st.title("🦅 JobSniper Dashboard")
-    st.markdown("### Welcome to your manual job hunting command center!")
+    st.title("📊 Dashboard Overview")
+    st.markdown("### Quick insights into your job search")
+    
+    # Load data
+    verified_df = load_verified_jobs()
+    history = load_history()
+    
+    # Get data from Supabase
+    try:
+        from src.modules.db_manager import get_all_jobs, get_statistics
+        tracker_jobs = get_all_jobs()
+        stats = get_statistics()
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        tracker_jobs = pd.DataFrame()
+        stats = {}
     
     # Key Metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -676,6 +690,9 @@ elif page == "📊 Overview":
 # --- PAGE 2: Job Listings ---
 elif page == "💼 Job Listings":
     st.title("💼 Job Listings")
+    
+    # Load verified jobs
+    verified_df = load_verified_jobs()
     
     if len(verified_df) == 0:
         st.warning("No jobs found yet. Run the scraper first!")
