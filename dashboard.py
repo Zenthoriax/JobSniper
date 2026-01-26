@@ -952,7 +952,32 @@ elif page == "📋 Application Tracker":
 
 # --- PAGE 4: Analytics ---
 elif page == "📈 Analytics":
-    st.title("📈 Analytics & Insights")
+    st.title("📈 Job Market Analytics")
+    st.markdown("### Visualize your job search data")
+    
+    # Load jobs from Supabase
+    try:
+        from src.modules.db_manager import get_all_jobs
+        jobs_df = get_all_jobs()
+        
+        # Rename columns to match expected format
+        if len(jobs_df) > 0:
+            verified_df = jobs_df.rename(columns={
+                'company': 'company',
+                'role': 'title',
+                'match_score': 'relevance_score',
+                'location': 'location'
+            })
+            # Add work_mode if not present
+            if 'work_mode' not in verified_df.columns:
+                verified_df['work_mode'] = verified_df['location'].apply(
+                    lambda x: 'Remote' if x and 'remote' in str(x).lower() else 'On-site'
+                )
+        else:
+            verified_df = pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error loading jobs: {e}")
+        verified_df = pd.DataFrame()
     
     if len(verified_df) == 0:
         st.warning("No data available yet. Run the scraper first!")
